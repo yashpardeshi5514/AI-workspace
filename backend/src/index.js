@@ -6,10 +6,13 @@ import 'express-async-errors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
-import authRoutes from './routes/auth';
-import fileRoutes from './routes/files';
-import { messageService } from './services/MessageService';
-import { AuthService } from './services/AuthService';
+
+import authRoutes from './routes/auth.js';
+import fileRoutes from './routes/files.js';
+
+import { messageService } from './services/MessageService.js';
+import { AuthService } from './services/AuthService.js';
+
 import { aiService } from 'ai-services';
 const app = express();
 const server = createServer(app);
