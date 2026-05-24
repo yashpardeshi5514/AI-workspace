@@ -31,6 +31,7 @@ export function ConversationList({
 
   useEffect(() => {
     loadConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, token]);
 
   const loadConversations = async () => {
@@ -96,6 +97,7 @@ export function StreamingChat({
 
   useEffect(() => {
     loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, token]);
 
   useEffect(() => {
