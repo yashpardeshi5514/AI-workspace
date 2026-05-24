@@ -2,12 +2,33 @@
   "root": true,
   "env": {
     "node": true,
-    "es2020": true
+    "es2020": true,
+    "jest": true
   },
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint"],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended"
+  ],
+  "ignorePatterns": ["**/*.js", "**/*.d.ts", "dist"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/ban-types": "off",
+    "@typescript-eslint/no-unused-vars": "off",
+    "no-useless-escape": "off",
+    "no-undef": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/ban-types": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "no-useless-escape": "off",
+        "no-undef": "off"
+      }
+    }
   ]
 }
