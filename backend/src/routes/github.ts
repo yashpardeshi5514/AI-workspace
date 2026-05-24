@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { GitHubService } from '../services/GitHubService';
 import { asyncHandler } from '../middleware/errorHandler';
-import axios from 'axios';
 
 const router = Router();
 
@@ -11,7 +10,8 @@ router.get('/user', authMiddleware, asyncHandler(async (req: AuthRequest, res: R
   const { githubToken } = req.body; // Passed from frontend after OAuth
 
   if (!githubToken) {
-    return res.status(400).json({ error: 'GitHub token required' });
+    res.status(400).json({ error: 'GitHub token required' });
+    return;
   }
 
   const service = new GitHubService(githubToken);
@@ -30,7 +30,8 @@ router.get('/repos/:username', authMiddleware, asyncHandler(async (req: AuthRequ
   const { githubToken } = req.query;
 
   if (!githubToken) {
-    return res.status(400).json({ error: 'GitHub token required' });
+    res.status(400).json({ error: 'GitHub token required' });
+    return;
   }
 
   const service = new GitHubService(githubToken as string);
@@ -44,7 +45,8 @@ router.post('/clone', authMiddleware, asyncHandler(async (req: AuthRequest, res:
   const { owner, repo, workspaceId } = req.body;
 
   if (!owner || !repo || !workspaceId) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
   }
 
   try {
@@ -62,7 +64,8 @@ router.get('/repos/:owner/:repo/files', authMiddleware, asyncHandler(async (req:
   const { githubToken, path = '', branch = 'main' } = req.query;
 
   if (!githubToken) {
-    return res.status(400).json({ error: 'GitHub token required' });
+    res.status(400).json({ error: 'GitHub token required' });
+    return;
   }
 
   const service = new GitHubService(githubToken as string);
@@ -77,14 +80,16 @@ router.get('/repos/:owner/:repo/file', authMiddleware, asyncHandler(async (req: 
   const { githubToken, path, branch = 'main' } = req.query;
 
   if (!githubToken || !path) {
-    return res.status(400).json({ error: 'GitHub token and path required' });
+    res.status(400).json({ error: 'GitHub token and path required' });
+    return;
   }
 
   const service = new GitHubService(githubToken as string);
   const content = await service.getFileContent(owner, repo, path as string, branch as string);
 
   if (!content) {
-    return res.status(404).json({ error: 'File not found' });
+    res.status(404).json({ error: 'File not found' });
+    return;
   }
 
   res.json({ content });
@@ -95,7 +100,8 @@ router.post('/pr/create', authMiddleware, asyncHandler(async (req: AuthRequest, 
   const { owner, repo, title, description, headBranch, githubToken } = req.body;
 
   if (!githubToken || !owner || !repo || !title || !headBranch) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
   }
 
   const service = new GitHubService(githubToken);
@@ -110,7 +116,8 @@ router.get('/repos/:owner/:repo/issues', authMiddleware, asyncHandler(async (req
   const { githubToken, state = 'open' } = req.query;
 
   if (!githubToken) {
-    return res.status(400).json({ error: 'GitHub token required' });
+    res.status(400).json({ error: 'GitHub token required' });
+    return;
   }
 
   const service = new GitHubService(githubToken as string);
@@ -124,7 +131,8 @@ router.post('/issues/create', authMiddleware, asyncHandler(async (req: AuthReque
   const { owner, repo, title, body, githubToken } = req.body;
 
   if (!githubToken || !owner || !repo || !title) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
   }
 
   const service = new GitHubService(githubToken);

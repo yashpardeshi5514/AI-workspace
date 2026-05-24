@@ -35,19 +35,19 @@ export class AdvancedRAGService {
         url: process.env.CHROMA_HOST || 'http://localhost:8000',
       });
 
-      const results = await vectorStore.similaritySearchWithScore(
+      const results = await (vectorStore as any).similaritySearchWithScore(
         query,
         limit
       );
 
       return results
-        .map(([doc, score]) => ({
+        .map(([doc, score]: [any, number]) => ({
           id: doc.metadata?.id || '',
           content: doc.pageContent,
           metadata: doc.metadata || {},
           score,
         }))
-        .filter(r => !filters?.minScore || r.score >= filters.minScore);
+        .filter((r: any) => !filters?.minScore || r.score >= filters.minScore);
     } catch (err) {
       console.error('RAG search error:', err);
       return [];

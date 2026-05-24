@@ -27,7 +27,6 @@ export function ConversationList({
   onNew,
 }: ConversationListProps) {
   const [conversations, setConversations] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const { token } = useAuthStore();
 
   useEffect(() => {
@@ -38,7 +37,6 @@ export function ConversationList({
     if (!token) return;
 
     try {
-      setIsLoading(true);
       const res = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations?workspaceId=${workspaceId}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -46,8 +44,6 @@ export function ConversationList({
       setConversations(res.data);
     } catch (err) {
       console.error('Failed to load conversations:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -149,16 +145,6 @@ export function StreamingChat({
     let assistantContent = '';
 
     try {
-      const eventSource = new EventSource(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/chat/stream`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          } as any,
-        }
-      );
-
       // Add placeholder for streaming response
       setMessages(prev => [
         ...prev,
@@ -215,7 +201,7 @@ export function StreamingChat({
                     )
                   );
                 }
-              } catch (e) {
+          } catch {
                 // Skip invalid JSON
               }
             }

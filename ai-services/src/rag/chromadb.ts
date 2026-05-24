@@ -1,4 +1,4 @@
-import { Chroma } from 'chromadb';
+import { ChromaClient } from 'chromadb';
 import { Chunk } from './chunker';
 
 interface SearchResult {
@@ -9,19 +9,20 @@ interface SearchResult {
 }
 
 export class ChromaDBClient {
-  private client: Chroma;
+  private client: ChromaClient;
   private collectionName: string;
 
   constructor(host = 'localhost', port = 8000, collectionName = 'workspace') {
-    this.client = new Chroma({
+    this.client = new ChromaClient({
       path: `http://${host}:${port}`,
     });
     this.collectionName = collectionName;
   }
 
   async indexChunks(chunks: Chunk[]): Promise<void> {
-    const collection = await this.client.get_or_create_collection({
+    const collection = await this.client.getOrCreateCollection({
       name: this.collectionName,
+      embeddingFunction: undefined as any
     });
 
     for (const chunk of chunks) {
@@ -34,29 +35,30 @@ export class ChromaDBClient {
   }
 
   async search(query: string, limit = 5): Promise<SearchResult[]> {
-    const collection = await this.client.get_collection({
+    const collection = await this.client.getCollection({
       name: this.collectionName,
+      embeddingFunction: undefined as any
     });
 
     const results = await collection.query({
-      query_texts: [query],
-      n_results: limit,
-    });
+      queryTexts: [query],
+      nResults: limit,
+    } as any);
 
     if (!results.ids[0]) {
       return [];
     }
 
-    return results.ids[0].map((id, index) => ({
+    return results.ids[0].map((id: string, index: number) => ({
       id,
-      content: results.documents[0][index] || '',
-      similarity: results.distances?.[0]?.[index] || 0,
-      metadata: results.metadatas?.[0]?.[index] || {},
+      content: (results.documents as any)[0][index] || '',
+      similarity: (results.distances as any)?.[0]?.[index] || 0,
+      metadata: (results.metadatas as any)?.[0]?.[index] || {},
     }));
   }
 
   async clear(): Promise<void> {
-    await this.client.delete_collection({
+    await this.client.deleteCollection({
       name: this.collectionName,
     });
   }

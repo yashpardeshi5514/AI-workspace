@@ -10,7 +10,8 @@ router.post('/execute', authMiddleware, asyncHandler(async (req: AuthRequest, re
   const { code, language } = req.body;
 
   if (!code || !language) {
-    return res.status(400).json({ error: 'Code and language required' });
+    res.status(400).json({ error: 'Code and language required' });
+    return;
   }
 
   const result = await codeExecutor.execute(code, language);

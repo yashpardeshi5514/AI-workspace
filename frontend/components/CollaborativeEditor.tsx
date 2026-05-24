@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Editor, OnChange, OnMount } from '@monaco-editor/react';
 
@@ -27,11 +27,10 @@ export function CollaborativeEditor({
 }: CollaborativeEditorProps) {
   const socketRef = useRef<Socket | null>(null);
   const editorRef = useRef<any>(null);
-  const [activeUsers, setActiveUsers] = React.useState<ActiveUser[]>([]);
+  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const currentUserRef = useRef<string>('user-' + Date.now());
 
   useEffect(() => {
-    // Initialize WebSocket
     socketRef.current = io(process.env.NEXT_PUBLIC_WS_URL || '', {
       path: '/socket.io',
     });
@@ -39,14 +38,12 @@ export function CollaborativeEditor({
     const socket = socketRef.current;
     const userId = currentUserRef.current;
 
-    // Join editor session
     socket.emit('join-editor', {
       fileId,
       userId,
       userName: 'User ' + userId.slice(-4),
     });
 
-    // Listen for user changes
     socket.on('user-joined', (data: { users: ActiveUser[] }) => {
       setActiveUsers(data.users);
     });
@@ -55,19 +52,18 @@ export function CollaborativeEditor({
       setActiveUsers(data.users);
     });
 
-    socket.on('cursor-updated', (cursor: ActiveUser['cursor']) => {
-      // Draw remote cursor in editor (could use decorations)
+    socket.on('cursor-updated', (_cursor: ActiveUser['cursor']) => {
+      // Remote cursor handling
     });
 
     socket.on('content-updated', (data: { userId: string; content: string }) => {
       if (data.userId !== userId && editorRef.current) {
-        // Update editor content from remote change
         editorRef.current.setValue(data.content);
       }
     });
 
-    // Get active users
     socket.emit('get-users', { fileId });
+
     socket.on('active-users', (users: ActiveUser[]) => {
       setActiveUsers(users);
     });
@@ -79,27 +75,23 @@ export function CollaborativeEditor({
   }, [fileId]);
 
   const handleEditorChange: OnChange = (newContent) => {
-    const content = newContent || '';
+    const updatedContent = newContent || '';
 
-    // Send to others
     if (socketRef.current) {
       socketRef.current.emit('content-change', {
         fileId,
         userId: currentUserRef.current,
-        newContent: content,
+        newContent: updatedContent,
       });
     }
 
-    onChange?.(content);
-  };
-
-  const handleEditorMount: OnMount = (editor) => {
-    editorRef.current = editor;
+    onChange?.(updatedContent);
   };
 
   const handleCursorChange = () => {
     if (editorRef.current && socketRef.current) {
       const selection = editorRef.current.getSelection();
+
       socketRef.current.emit('cursor-move', {
         fileId,
         userId: currentUserRef.current,
@@ -109,12 +101,21 @@ export function CollaborativeEditor({
     }
   };
 
+  const handleEditorMount: OnMount = (editor) => {
+    editorRef.current = editor;
+
+    editor.onDidChangeCursorPosition(() => {
+      handleCursorChange();
+    });
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Active Users Bar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border-b border-zinc-700 text-xs">
         <span className="text-zinc-400">Editing:</span>
-        {activeUsers.map(user => (
+
+        {activeUsers.map((user) => (
           <div
             key={user.userId}
             className="flex items-center gap-1 px-2 py-1 bg-zinc-700 rounded"
@@ -125,6 +126,7 @@ export function CollaborativeEditor({
                 backgroundColor: hashColor(user.userId),
               }}
             />
+
             <span>{user.userName}</span>
           </div>
         ))}
@@ -138,7 +140,6 @@ export function CollaborativeEditor({
           value={content}
           onChange={handleEditorChange}
           onMount={handleEditorMount}
-          onCursorPositionChange={handleCursorChange}
           options={{
             minimap: { enabled: false },
             readOnly,
@@ -150,7 +151,6 @@ export function CollaborativeEditor({
   );
 }
 
-// Helper to generate consistent colors for users
 function hashColor(str: string): string {
   const colors = [
     '#ff6b6b',
@@ -160,9 +160,12 @@ function hashColor(str: string): string {
     '#ff006e',
     '#8338ec',
   ];
+
   let hash = 0;
+
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
+
   return colors[Math.abs(hash) % colors.length];
 }

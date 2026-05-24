@@ -12,7 +12,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
-  const { token, login } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const { error: showError } = useNotifications();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,9 +23,12 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
     const validationErrors = validateForm(
       { email, password },
       {
-        email: validators.email,
-        password: (p) => (p.length >= 6 ? null : 'Password must be at least 6 characters'),
-      }
+  email: (value) =>
+    validators.email(value) ? null : 'Invalid email address',
+
+  password: (p) =>
+    p.length >= 6 ? null : 'Password must be at least 6 characters',
+}
     );
 
     if (validationErrors.length > 0) {
@@ -39,7 +42,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
         { email, password }
       );
-      login(res.data.token, res.data.user);
+      setAuth(res.data.user, res.data.token);
       onSuccess?.();
     } catch (err: any) {
       showError(err.response?.data?.message || 'Login failed');
@@ -110,7 +113,7 @@ export function SignupForm({ onSuccess }: { onSuccess?: () => void }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
-  const { login } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const { error: showError } = useNotifications();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,11 +124,12 @@ export function SignupForm({ onSuccess }: { onSuccess?: () => void }) {
     const validationErrors = validateForm(
       { email, password, confirmPassword },
       {
-        email: validators.email,
-        password: () => passwordError,
-        confirmPassword: (p) =>
-          p !== password ? 'Passwords do not match' : null,
-      }
+  email: (value) =>
+    validators.email(value) ? null : 'Invalid email address',
+
+  password: (p) =>
+    p.length >= 6 ? null : 'Password must be at least 6 characters',
+}
     );
 
     if (validationErrors.length > 0) {
@@ -139,7 +143,7 @@ export function SignupForm({ onSuccess }: { onSuccess?: () => void }) {
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`,
         { email, password }
       );
-      login(res.data.token, res.data.user);
+      setAuth(res.data.user, res.data.token);
       onSuccess?.();
     } catch (err: any) {
       showError(err.response?.data?.message || 'Signup failed');

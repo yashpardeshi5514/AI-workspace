@@ -14,7 +14,8 @@ router.get(
     const { days = 30 } = req.query;
 
     if (!workspaceId) {
-      return res.status(400).json({ error: 'Workspace ID required' });
+      res.status(400).json({ error: 'Workspace ID required' });
+      return;
     }
 
     const analytics = await enterpriseService.getAnalytics(
@@ -33,7 +34,8 @@ router.post(
     const { workspaceId, event, data } = req.body;
 
     if (!workspaceId || !event) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
     }
 
     const metadata = {
@@ -61,7 +63,8 @@ router.post(
     const { workspaceId, email, role } = req.body;
 
     if (!workspaceId || !email) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
     }
 
     const member = await enterpriseService.addTeamMember(
@@ -82,7 +85,8 @@ router.get(
     const { workspaceId } = req.query;
 
     if (!workspaceId) {
-      return res.status(400).json({ error: 'Workspace ID required' });
+      res.status(400).json({ error: 'Workspace ID required' });
+      return;
     }
 
     const members = await enterpriseService.getTeamMembers(
@@ -100,7 +104,8 @@ router.patch(
     const { role } = req.body;
 
     if (!role) {
-      return res.status(400).json({ error: 'Role required' });
+      res.status(400).json({ error: 'Role required' });
+      return;
     }
 
     const member = await enterpriseService.updateMemberRole(memberId, role);
@@ -116,7 +121,8 @@ router.post(
     const { workspaceId, type, name, config } = req.body;
 
     if (!workspaceId || !type || !name) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
     }
 
     const integration = await enterpriseService.createIntegration(
@@ -137,7 +143,8 @@ router.get(
     const { workspaceId } = req.query;
 
     if (!workspaceId) {
-      return res.status(400).json({ error: 'Workspace ID required' });
+      res.status(400).json({ error: 'Workspace ID required' });
+      return;
     }
 
     const integrations = await enterpriseService.getIntegrations(
@@ -155,7 +162,8 @@ router.get(
     const { workspaceId } = req.query;
 
     if (!workspaceId) {
-      return res.status(400).json({ error: 'Workspace ID required' });
+      res.status(400).json({ error: 'Workspace ID required' });
+      return;
     }
 
     const logs = await enterpriseService.getAuditLog(workspaceId as string);

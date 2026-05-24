@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import { Trash2, Copy, Edit2, FolderPlus } from 'lucide-react';
 
 interface ContextMenuProps {
@@ -22,16 +22,7 @@ export function ContextMenu({
   onCreateFolder,
   isDirectory,
 }: ContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = () => {
-      menuRef.current = null;
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div

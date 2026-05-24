@@ -1,6 +1,17 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+export interface IUser extends mongoose.Document {
+  email: string;
+  name: string;
+  passwordHash: string;
+  comparePassword(password: string): Promise<boolean>;
+}
+
+export interface UserModel extends mongoose.Model<IUser> {
+  hashPassword(password: string): Promise<string>;
+}
+
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -22,20 +33,20 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.methods.comparePassword = async function (password: string) {
+userSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
   return bcrypt.compare(password, this.passwordHash);
 };
 
-userSchema.statics.hashPassword = async function (password: string) {
+userSchema.statics.hashPassword = async function (password: string): Promise<string> {
   const salt = await bcrypt.genSalt(10);
   return bcrypt.hash(password, salt);
 };
 
 userSchema.set('toJSON', {
   transform: (doc, ret) => {
-    delete ret.passwordHash;
+    delete (ret as any).passwordHash;
     return ret;
   },
 });
 
-export const User = mongoose.model('User', userSchema);
+export const User = mongoose.model<IUser, UserModel>('User', userSchema);

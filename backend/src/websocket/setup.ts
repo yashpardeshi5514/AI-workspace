@@ -1,7 +1,7 @@
 // WebSocket setup for real-time features
 import { Server } from 'socket.io';
 import { Server as HTTPServer } from 'http';
-import { chatService } from './ChatService';
+import { chatService } from '../services/ChatService';
 
 export function setupWebSocket(httpServer: HTTPServer) {
   const io = new Server(httpServer, {

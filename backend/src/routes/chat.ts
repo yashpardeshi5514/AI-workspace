@@ -13,7 +13,8 @@ router.post('/conversations', authMiddleware, asyncHandler(async (req: AuthReque
   const { workspaceId, title } = req.body;
 
   if (!workspaceId || !title) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
   }
 
   const conv = await chatService.createConversation(
@@ -30,7 +31,8 @@ router.get('/conversations', authMiddleware, asyncHandler(async (req: AuthReques
   const { workspaceId } = req.query;
 
   if (!workspaceId) {
-    return res.status(400).json({ error: 'Workspace ID required' });
+    res.status(400).json({ error: 'Workspace ID required' });
+    return;
   }
 
   const conversations = await chatService.getConversations(workspaceId as string);
@@ -57,7 +59,8 @@ router.post('/chat/stream', authMiddleware, async (req: AuthRequest, res: Respon
     const { workspaceId, conversationId, message } = req.body;
 
     if (!workspaceId || !conversationId || !message) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
     }
 
     // Save user message
@@ -76,8 +79,8 @@ router.post('/chat/stream', authMiddleware, async (req: AuthRequest, res: Respon
     let ragContext = '';
     let sourceFiles: string[] = [];
     try {
-      const ragResults = await ragService.search(message, workspaceId, 3);
-      sourceFiles = ragResults.map(r => r.metadata?.filename || r.id);
+      const ragResults = await ragService.search(message, 3) as any[];
+      sourceFiles = ragResults.map((r: any) => r.metadata?.filename || r.id);
       ragContext = ragResults.map(r => r.content).join('\n\n');
     } catch (err) {
       console.error('RAG search error:', err);
@@ -150,7 +153,8 @@ router.post('/chat', authMiddleware, asyncHandler(async (req: AuthRequest, res: 
   const { workspaceId, conversationId, message } = req.body;
 
   if (!workspaceId || !conversationId || !message) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
   }
 
   // Save user message
@@ -169,8 +173,8 @@ router.post('/chat', authMiddleware, asyncHandler(async (req: AuthRequest, res: 
   let ragContext = '';
   let sourceFiles: string[] = [];
   try {
-    const ragResults = await ragService.search(message, workspaceId, 3);
-    sourceFiles = ragResults.map(r => r.metadata?.filename || r.id);
+    const ragResults = await ragService.search(message, 3) as any[];
+    sourceFiles = ragResults.map((r: any) => r.metadata?.filename || r.id);
     ragContext = ragResults.map(r => r.content).join('\n\n');
   } catch (err) {
     console.error('RAG search error:', err);
@@ -223,7 +227,8 @@ router.get('/search', authMiddleware, asyncHandler(async (req: AuthRequest, res:
   const { workspaceId, query, type = 'all' } = req.query;
 
   if (!workspaceId || !query) {
-    return res.status(400).json({ error: 'Missing query parameters' });
+    res.status(400).json({ error: 'Missing query parameters' });
+    return;
   }
 
   const results: any = {};
@@ -260,7 +265,8 @@ router.patch('/conversations/:id/title', authMiddleware, asyncHandler(async (req
   const { title } = req.body;
 
   if (!title) {
-    return res.status(400).json({ error: 'Title required' });
+    res.status(400).json({ error: 'Title required' });
+    return;
   }
 
   const conv = await chatService.updateConversationTitle(id, title);
