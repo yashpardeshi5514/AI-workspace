@@ -1,0 +1,352 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, staging]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '20'
+
+jobs:
+  # Phase 1: Lint & Type Check
+  quality:
+    runs-on: ubuntu-latest
+    name: Code Quality
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint --workspaces
+
+      - name: Type check
+        run: npm run build --workspaces
+
+      - name: Check formatting
+        run: npx prettier --check .
+
+  # Phase 2: Unit & Integration Tests
+  test:
+    runs-on: ubuntu-latest
+    name: Tests
+    needs: quality
+
+    services:
+      mongo:
+        image: mongo:7
+        options: >-
+          --health-cmd mongosh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 27017:27017
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test --workspaces
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/ai-workspace-test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
+          OPENAI_API_KEY: test-openai-key
+
+      - name: Generate coverage
+        run: npm run test:coverage --workspaces
+        continue-on-error: true
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  # Phase 3: Security Scan
+  security:
+    runs-on: ubuntu-latest
+    name: Security Check
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: NPM audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  # Phase 4: Build Docker Images
+  build:
+    runs-on: ubuntu-latest
+    name: Build Images
+    needs: [quality, test, security]
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service: frontend
+            dockerfile: frontend/Dockerfile
+            image: ${{ github.repository }}/frontend
+          - service: backend
+            dockerfile: backend/Dockerfile
+            image: ${{ github.repository }}/backend
+          - service: nginx
+            dockerfile: infrastructure/docker/Nginx.dockerfile
+            image: ${{ github.repository }}/nginx
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ matrix.image }}:buildcache,mode=max
+
+  # Phase 5: Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    name: Deploy to Staging
+    needs: build
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://staging.example.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts 2>/dev/null
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml $DEPLOY_USER@$DEPLOY_HOST:/app/
+          ssh -i ~/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST 'cd /app && docker-compose pull && docker-compose up -d'
+
+      - name: Health check
+        run: |
+          for i in {1..30}; do
+            if curl -f https://staging.example.com/health; then
+              echo "✓ Staging health check passed"
+              exit 0
+            fi
+            echo "Attempt $i/30..."
+            sleep 10
+          done
+          echo "✗ Health check failed"
+          exit 1
+
+      - name: Run smoke tests
+        run: |
+          npm install -D @playwright/test
+          npx playwright test tests/smoke.spec.ts --project=staging
+        env:
+          TEST_URL: https://staging.example.com
+
+  # Phase 6: Deploy to Production
+  deploy-prod:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://app.example.com
+    concurrency: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create deployment
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'production',
+              required_contexts: [],
+              auto_merge: false
+            });
+            return deployment.data.id;
+
+      - name: Backup database
+        env:
+          DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          DB_USER: ${{ secrets.PROD_DB_USER }}
+          DB_PASS: ${{ secrets.PROD_DB_PASS }}
+        run: |
+          echo "Creating backup..."
+          mongodump --host=$DB_HOST --username=$DB_USER --password=$DB_PASS --out=./backup
+
+      - name: Deploy to production
+        env:
+          DEPLOY_KEY: ${{ secrets.PROD_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.PROD_HOST }}
+          DEPLOY_USER: ${{ secrets.PROD_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts 2>/dev/null
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml $DEPLOY_USER@$DEPLOY_HOST:/app/
+          ssh -i ~/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST 'cd /app && docker-compose pull && docker-compose up -d'
+
+      - name: Database migrations
+        env:
+          PROD_DB: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          npm run migrate:up
+        continue-on-error: true
+
+      - name: Health check
+        run: |
+          for i in {1..30}; do
+            if curl -f https://app.example.com/health; then
+              echo "✓ Production health check passed"
+              exit 0
+            fi
+            echo "Attempt $i/30..."
+            sleep 10
+          done
+          echo "✗ Health check failed - rolling back"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        env:
+          DEPLOY_KEY: ${{ secrets.PROD_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.PROD_HOST }}
+          DEPLOY_USER: ${{ secrets.PROD_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST 'cd /app && docker-compose up -d --no-build'
+
+      - name: Update deployment status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: '${{ job.status }}',
+              environment_url: 'https://app.example.com',
+              description: 'Deployment ${{ job.status }}'
+            });
+
+  # Phase 7: Notify
+  notify:
+    runs-on: ubuntu-latest
+    name: Notifications
+    needs: [quality, test, deploy-prod]
+    if: always()
+
+    steps:
+      - name: Slack notification
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "CI/CD Pipeline: ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*CI/CD Pipeline*\nStatus: ${{ job.status }}\nBranch: ${{ github.ref }}\nCommit: ${{ github.sha }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

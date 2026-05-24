@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ai-workspace
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    environment:
+      CHROMA_DB_IMPL: duckdb+parquet
+      PERSIST_DIRECTORY: /chroma_data
+    volumes:
+      - chroma_data:/chroma_data
+
+volumes:
+  mongo_data:
+  redis_data:
+  chroma_data:

@@ -1,0 +1,88 @@
+{
+  "name": "ai-workspace-vscode",
+  "displayName": "AI Workspace",
+  "description": "Access your AI Workspace directly from VS Code",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:ai-workspace.chat",
+    "onCommand:ai-workspace.openChat"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-workspace",
+          "title": "AI Workspace",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ai-workspace": [
+        {
+          "id": "ai-workspace.chat",
+          "name": "Chat",
+          "type": "webview"
+        },
+        {
+          "id": "ai-workspace.search",
+          "name": "Search",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ai-workspace.openChat",
+        "title": "Open AI Workspace Chat"
+      },
+      {
+        "command": "ai-workspace.executeCode",
+        "title": "Execute Code with AI Workspace"
+      },
+      {
+        "command": "ai-workspace.sendSelection",
+        "title": "Send Selection to AI Workspace"
+      }
+    ],
+    "configuration": {
+      "title": "AI Workspace",
+      "properties": {
+        "aiWorkspace.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:3001",
+          "description": "AI Workspace server URL"
+        },
+        "aiWorkspace.apiKey": {
+          "type": "string",
+          "description": "API key for authentication"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

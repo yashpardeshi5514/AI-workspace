@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  # Database
+  mongo:
+    image: mongo:7
+    container_name: ai-workspace-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ai-workspace
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ai-workspace-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Vector DB
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: ai-workspace-chroma
+    ports:
+      - "8000:8000"
+    environment:
+      CHROMA_DB_IMPL: duckdb+parquet
+      PERSIST_DIRECTORY: /chroma_data
+    volumes:
+      - chroma_data:/chroma_data
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ai-workspace-backend
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://mongo:27017/ai-workspace
+      REDIS_URL: redis://redis:6379
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-4-turbo
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    depends_on:
+      - mongo
+      - redis
+      - chroma
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: ai-workspace-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_WS_URL: ws://localhost:3001
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Nginx.dockerfile
+    container_name: ai-workspace-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  redis_data:
+  chroma_data:
+
+networks:
+  app-network:
+    driver: bridge
