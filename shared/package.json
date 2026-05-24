@@ -6,5 +6,6 @@
   "types": "index.ts",
   "scripts": {
     "build": "echo Build skipped"
+    
   }
 }
